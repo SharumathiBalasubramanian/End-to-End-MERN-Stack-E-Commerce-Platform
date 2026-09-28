@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 import Product from "../models/Product.js"
 
+=======
+import Product from "../models/Product.js";
+>>>>>>> a7b5ee5635d1dd85dcb7d5386fd3e054fbf424c5
 
 /**
  * RapidMiner-based Recommendation System
