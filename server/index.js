@@ -15,7 +15,29 @@ connectDB();
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
+// CORS Configuration - Allows Localhost, Netlify, and your CLIENT_URL env variable
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.CLIENT_URL, // Example: https://your-site.netlify.app
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".netlify.app")) {
+        callback(null, true);
+      } else {
+        callback(new Error("Blocked by CORS policy"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 
 // API Endpoints
@@ -26,7 +48,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
 // Root Health Check
-app.get("/", (req, res) => res.json({ status: "Online", message: "Market & Co. Core API Active" }));
+app.get("/", (req, res) => res.json({ status: "Online", message: "Urban Craft. Core API Active" }));
 
 // Error Handlers
 app.use(notFound);
