@@ -1,74 +1,87 @@
-import React from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import { addToCart } from "../redux/slices/cartSlice.js";
 
-const ProductCard = ({ product = {} }) => {
+const ProductCard = ({ product }) => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const id = product._id || product.id;
+  const [added, setAdded] = useState(false);
+
+  // Fallback check for MongoDB _id or custom id
+  const productId = product?._id || product?.id;
+
+  const imgSrc =
+    product?.image ||
+    product?.imageUrl ||
+    product?.images?.[0] ||
+    "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=700&q=80";
 
   const handleAddToCart = (e) => {
+    // Stops the card from navigating to the details page when clicking "Add to Cart"
+    e.preventDefault();
     e.stopPropagation();
-    dispatch(
-      addToCart({
-        productId: id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        stock: product.stock ?? 10,
-        quantity: 1,
-      })
-    );
+
+    dispatch(addToCart(product));
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1200);
   };
 
   return (
-    <div
-      onClick={() => navigate(`/products/${id}`)}
-      className="bg-white rounded-2xl border border-gray-100/80 p-3.5 flex flex-col justify-between cursor-pointer hover:shadow-md transition-shadow duration-200"
-    >
+    <div className="bg-white border border-neutral-100 rounded-3xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group">
+      {/* Clickable Card Link for Image */}
+      <Link
+        to={`/products/${productId}`}
+        className="block overflow-hidden rounded-2xl mb-4 bg-neutral-100 h-56"
+      >
+        <img
+          src={imgSrc}
+          alt={product?.name || "Product"}
+          loading="lazy"
+          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src =
+              "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=700&q=80";
+          }}
+        />
+      </Link>
+
+      {/* Info Section */}
       <div>
-        {/* Soft Sand Rounded Image Box */}
-        <div className="w-full h-44 mb-3.5 overflow-hidden rounded-xl bg-[#F0ECE6] flex items-center justify-center">
-          <img
-            src={product.image || "https://via.placeholder.com/300x200"}
-            alt={product.name}
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-          />
-        </div>
-
-        {/* Terracotta Category Label */}
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#D95D39] block mb-1">
-          {product.category || "ELECTRONICS"}
-        </span>
-
-        {/* Product Title */}
-        <h3 className="text-[15px] font-bold text-gray-900 leading-snug line-clamp-1">
-          {product.name}
-        </h3>
-
-        {/* Short Subtitle / Description */}
-        <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-relaxed font-normal">
-          {product.description}
+        <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-1">
+          {product?.category || "Artisan Craft"}
+        </p>
+        <Link to={`/products/${productId}`}>
+          <h3 className="font-bold text-neutral-900 text-base line-clamp-1 hover:underline cursor-pointer mb-1">
+            {product?.name}
+          </h3>
+        </Link>
+        <p className="text-xs text-neutral-400 line-clamp-2 mb-4">
+          {product?.description}
         </p>
       </div>
 
-      {/* Footer Row: Price + Rating on Left, Black Button on Right */}
-      <div className="mt-4 pt-3 flex items-center justify-between border-t border-gray-100">
+      {/* Footer / Price & Add to Cart */}
+      <div className="flex items-center justify-between pt-2 border-t border-neutral-50">
         <div>
-          <span className="text-base font-bold text-gray-900">
-            ₹{product.price}
+          <span className="text-base font-extrabold text-neutral-900">
+            ₹{product?.price}
           </span>
-          <div className="text-[11px] text-amber-500 font-medium flex items-center gap-1 mt-0.5">
-            <span>★</span> {product.ratings || 4.5}
+          <div className="text-[11px] text-amber-500 font-semibold">
+            ★ {product?.rating || 4.8}
           </div>
         </div>
 
         <button
+          type="button"
           onClick={handleAddToCart}
-          className="bg-[#1A1A1A] hover:bg-black text-white text-xs font-medium px-4 py-2 rounded-full transition active:scale-95 shadow-2xs"
+          className={`text-xs font-semibold px-4 py-2 rounded-full cursor-pointer transition-colors ${
+            added
+              ? "bg-green-600 text-white"
+              : "bg-black hover:bg-neutral-800 text-white"
+          }`}
         >
-          Add to Cart
+          {added ? "✓ Added" : "Add to Cart"}
         </button>
       </div>
     </div>

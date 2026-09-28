@@ -2,57 +2,34 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/dbConnection.js";
-
-import authRoutes from "./routes/authenticationRoutes.js";
-import profileRoutes from "./routes/userProfileRoutes.js";
+import authenticationRoutes from "./routes/authenticationRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import userProfileRoutes from "./routes/userProfileRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
-import { notFound, errorHandler } from "./middleware/errorHandler.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 dotenv.config();
+
+// Connect to Database
 connectDB();
 
 const app = express();
 
-// CORS Configuration - Allows Localhost, Netlify, and your CLIENT_URL env variable
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  process.env.CLIENT_URL, 
-].filter(Boolean);
+// Essential Middleware
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(express.json()); // Essential: parses JSON bodies from frontend
+app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".netlify.app")) {
-        callback(null, true);
-      } else {
-        callback(new Error("Blocked by CORS policy"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
-app.use(express.json());
-
-// API Endpoints
-app.use("/api/auth", authRoutes);
-app.use("/api/auth", profileRoutes);
+// API Routes
+app.use("/api/auth", authenticationRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/users", userProfileRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
-// Root Health Check
-app.get("/", (req, res) => res.json({ status: "Online", message: "Urban Craft. Core API Active" }));
-
-// Error Handlers
-app.use(notFound);
+// Error Middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`[Server Running]: Port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

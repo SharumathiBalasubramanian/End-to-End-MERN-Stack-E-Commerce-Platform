@@ -1,17 +1,24 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { loginUser, registerUser } from "../thunks/authThunks.js";
 
-const getSavedUser = () => {
+// Helper function to safely read and parse localStorage
+const getStoredUser = () => {
   try {
-    return JSON.parse(localStorage.getItem("user"));
-  } catch {
+    const item = localStorage.getItem("user");
+    if (!item || item === "undefined") {
+      localStorage.removeItem("user");
+      return null;
+    }
+    return JSON.parse(item);
+  } catch (error) {
+    console.error("Failed to parse user from localStorage:", error);
+    localStorage.removeItem("user");
     return null;
   }
 };
 
 const initialState = {
-  user: getSavedUser(),
-  token: localStorage.getItem("token") || null,
+  user: getStoredUser(),
   loading: false,
   error: null,
 };
@@ -22,8 +29,7 @@ const authSlice = createSlice({
   reducers: {
     logout: (state) => {
       state.user = null;
-      state.token = null;
-      localStorage.removeItem("token");
+      state.error = null;
       localStorage.removeItem("user");
     },
     clearAuthError: (state) => {
@@ -31,30 +37,36 @@ const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    const authSuccess = (state, action) => {
-      state.loading = false;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-      localStorage.setItem("token", action.payload.token);
-      localStorage.setItem("user", JSON.stringify(action.payload.user));
-    };
-
     builder
-      .addCase(loginUser.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(loginUser.fulfilled, authSuccess)
-      .addCase(loginUser.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
+      // Register
       .addCase(registerUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(registerUser.fulfilled, authSuccess)
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        if (action.payload) {
+          localStorage.setItem("user", JSON.stringify(action.payload));
+        }
+      })
       .addCase(registerUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Login
+      .addCase(loginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        if (action.payload) {
+          localStorage.setItem("user", JSON.stringify(action.payload));
+        }
+      })
+      .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

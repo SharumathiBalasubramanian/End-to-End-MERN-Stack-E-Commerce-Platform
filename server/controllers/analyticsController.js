@@ -1,4 +1,5 @@
-import Product from "../models/Product";
+import Product from "../models/Product.js"
+
 
 /**
  * RapidMiner-based Recommendation System

@@ -1,16 +1,34 @@
 import mongoose from "mongoose";
 
-const orderItemSchema = new mongoose.Schema({
-  product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-  name: { type: String, required: true },
-  price: { type: Number, required: true },
-  quantity: { type: Number, required: true, min: 1 },
-});
-
 const orderSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    items: [orderItemSchema],
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    orderItems: [
+      {
+        name: { type: String, required: true },
+        qty: { type: Number, required: true },
+        image: { type: String, required: true },
+        price: { type: Number, required: true },
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+      },
+    ],
+    items: [
+      {
+        name: { type: String },
+        quantity: { type: Number },
+        image: { type: String },
+        price: { type: Number },
+        product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+      },
+    ],
     shippingAddress: {
       street: { type: String, required: true },
       city: { type: String, required: true },
@@ -18,12 +36,21 @@ const orderSchema = new mongoose.Schema(
       zip: { type: String, required: true },
       country: { type: String, required: true },
     },
-    paymentMethod: { type: String, default: "Cash on Delivery" },
-    totalAmount: { type: Number, required: true },
-    status: {
+    paymentMethod: {
       type: String,
-      enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
-      default: "pending",
+      default: "Cash on Delivery",
+    },
+    totalPrice: {
+      type: Number,
+      required: true,
+    },
+    isPaid: {
+      type: Boolean,
+      default: false,
+    },
+    isDelivered: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

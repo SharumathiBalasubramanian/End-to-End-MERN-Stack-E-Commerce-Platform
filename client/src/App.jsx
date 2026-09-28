@@ -7,7 +7,9 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Home from "./pages/Home.jsx";
 import ProductDetail from "./pages/ProductDetails.jsx";
 import Cart from "./pages/Cart.jsx";
+import Checkout from "./pages/Checkout.jsx";
 import Orders from "./pages/Orders.jsx";
+import OrderSuccess from "./pages/OrderSuccess.jsx";
 import Contact from "./pages/Contact.jsx";
 import Login from "./pages/Login.jsx";
 
@@ -20,10 +22,29 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route
+            path="/order-success/:id"
+            element={
+              <ProtectedRoute>
+                <OrderSuccess />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-          <Route path="*" element={<div className="text-center py-20 font-bold">404 - Not Found</div>} />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <Orders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="*"
+            element={<div className="text-center py-20 font-bold">404 - Not Found</div>}
+          />
         </Routes>
       </main>
       <Footer />

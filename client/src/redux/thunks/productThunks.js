@@ -1,41 +1,52 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import axiosInstance from "../../api/axiosInstance.js";
+import axios from "axios";
 
-export const fetchProducts = createAsyncThunk("products/fetchAll", async (params = {}, { rejectWithValue }) => {
-  try {
-    const cleanedParams = Object.fromEntries(
-      Object.entries(params).filter(([_, val]) => val !== "" && val !== null && val !== undefined)
-    );
-    const { data } = await axiosInstance.get("/products", { params: cleanedParams });
-    return data;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message || "Failed to load catalog");
-  }
-});
+const API_BASE_URL = "http://localhost:5000/api/products";
 
-export const fetchProductById = createAsyncThunk("products/fetchOne", async (id, { rejectWithValue }) => {
-  try {
-    const { data } = await axiosInstance.get(`/products/${id}`);
-    return data.product;
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message || "Product not found");
+// 1. Fetch Categories
+export const fetchCategories = createAsyncThunk(
+  "products/fetchCategories",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/categories`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("fetchCategories error:", error);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch categories"
+      );
+    }
   }
-});
+);
 
-export const fetchCategories = createAsyncThunk("products/fetchCategories", async (_, { rejectWithValue }) => {
-  try {
-    const { data } = await axiosInstance.get("/products/categories");
-    return data.categories || [];
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message || "Failed to load categories");
+// 2. Fetch All Products
+export const fetchProducts = createAsyncThunk(
+  "products/fetchProducts",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(API_BASE_URL, { params });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("fetchProducts error:", error);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch products"
+      );
+    }
   }
-});
+);
 
-export const fetchRecommendations = createAsyncThunk("products/fetchRecommendations", async (id, { rejectWithValue }) => {
-  try {
-    const { data } = await axiosInstance.get(`/analytics/recommendations/${id}`);
-    return data.recommendations || [];
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message || "Failed to load recommendations");
+// 3. Fetch Single Product
+export const fetchProductById = createAsyncThunk(
+  "products/fetchProductById",
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error("fetchProductById error:", error);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch product details"
+      );
+    }
   }
-});
+);

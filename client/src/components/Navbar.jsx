@@ -1,75 +1,82 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { FiSearch, FiShoppingBag, FiMenu, FiX, FiUser } from "react-icons/fi";
 import { logout } from "../redux/slices/authSlice.js";
 
 const Navbar = () => {
-  // SET YOUR BRAND NAME HERE:
-  const BRAND_NAME = "Urban Craft";
-
-  const { user } = useSelector((state) => state.auth);
-  const cartCount = useSelector((state) =>
-    state.cart.items.reduce((acc, i) => acc + i.quantity, 0)
-  );
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    navigate(`/?keyword=${encodeURIComponent(search)}`);
-    setOpen(false);
+  const { user } = useSelector((state) => state.auth);
+  const { cartItems } = useSelector((state) => state.cart || { cartItems: [] });
+
+  // Calculate total number of items in the cart
+  const totalCartCount = cartItems.reduce(
+    (acc, item) => acc + (item.qty || item.quantity || 1),
+    0
+  );
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate("/login");
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-black/5">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
-        {/* Brand Name Logo */}
-        <Link to="/" className="text-xl font-bold tracking-tight text-gray-900 shrink-0">
-          {BRAND_NAME}<span className="text-[#D95D39]">.</span>
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-neutral-100">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        {/* Brand Logo */}
+        <Link to="/" className="flex items-center gap-1.5">
+          <span className="text-xl sm:text-2xl font-serif font-black tracking-tight text-neutral-900">
+            Urban Craft<span className="text-amber-700">.</span>
+          </span>
         </Link>
 
-        {/* Search Bar */}
-        <form
-          onSubmit={handleSearch}
-          className="hidden md:flex flex-1 max-w-lg items-center border border-gray-200 rounded-full px-4 py-2 bg-white shadow-2xs focus-within:border-gray-400 transition"
-        >
-          <FiSearch className="text-gray-400 mr-2 text-sm" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search essentials..."
-            className="w-full bg-transparent outline-none text-sm placeholder:text-gray-400 text-gray-800"
-          />
-        </form>
+        {/* Navigation Links */}
+        <nav className="flex items-center gap-5 sm:gap-7 text-xs sm:text-sm font-medium text-neutral-700">
+          <Link to="/" className="hover:text-black transition-colors">
+            Shop
+          </Link>
 
-        {/* Right Navigation */}
-        <nav className="flex items-center gap-6 text-sm font-medium text-gray-700">
-          <Link to="/" className="hover:text-black transition hidden sm:block">Shop</Link>
-          <Link to="/contact" className="hover:text-black transition hidden sm:block">Contact</Link>
-          {user && <Link to="/orders" className="hover:text-black transition hidden sm:block">Orders</Link>}
+          <Link to="/contact" className="hover:text-black transition-colors">
+            Contact
+          </Link>
 
-          {/* Cart Icon */}
-          <Link to="/cart" className="relative flex items-center p-1 text-gray-800 hover:text-black">
-            <FiShoppingBag size={20} />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#D95D39] text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">
-                {cartCount}
+          {/* Orders Link (Plain link without number badge) */}
+          {user && (
+            <Link
+              to="/orders"
+              className="hover:text-black transition-colors font-medium"
+            >
+              Orders
+            </Link>
+          )}
+
+          {/* Cart Link with count badge */}
+          <Link
+            to="/cart"
+            className="flex items-center gap-1.5 hover:text-black transition-colors font-medium"
+          >
+            <span>Cart</span>
+            {totalCartCount > 0 && (
+              <span className="bg-black text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-4 text-center">
+                {totalCartCount}
               </span>
             )}
           </Link>
 
-          {/* Auth Button */}
+          {/* User Auth Info & Actions */}
           {user ? (
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-600 font-semibold flex items-center gap-1">
-                <FiUser /> {user.name?.split(" ")[0]}
+            <div className="flex items-center gap-3 pl-2 border-l border-neutral-200">
+              <span className="text-neutral-500 text-xs hidden sm:inline">
+                Hi,{" "}
+                <b className="text-neutral-900">
+                  {user.name?.split(" ")[0] || "User"}
+                </b>
               </span>
               <button
-                onClick={() => dispatch(logout())}
-                className="bg-black text-white text-xs px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition"
+                type="button"
+                onClick={handleLogout}
+                className="text-xs text-red-500 hover:text-red-700 font-semibold cursor-pointer underline"
               >
                 Logout
               </button>
@@ -77,15 +84,11 @@ const Navbar = () => {
           ) : (
             <Link
               to="/login"
-              className="bg-[#1A1A1A] hover:bg-black text-white text-xs px-5 py-2.5 rounded-full font-medium tracking-wide transition shadow-2xs"
+              className="bg-black hover:bg-neutral-800 text-white text-xs font-semibold px-4 py-2 rounded-full transition-colors ml-2"
             >
-              Login
+              Sign In
             </Link>
           )}
-
-          <button onClick={() => setOpen(!open)} className="md:hidden text-gray-700">
-            {open ? <FiX size={22} /> : <FiMenu size={22} />}
-          </button>
         </nav>
       </div>
     </header>

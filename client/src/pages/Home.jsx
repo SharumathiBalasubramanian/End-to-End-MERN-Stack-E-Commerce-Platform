@@ -1,150 +1,235 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
+import ProductCard from "../components/ProductCard.jsx";
 import { fetchProducts, fetchCategories } from "../redux/thunks/productThunks.js";
 import { setFilters } from "../redux/slices/productSlice.js";
-import ProductCard from "../components/ProductCard.jsx";
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const Home = () => {
   const dispatch = useDispatch();
-  const [searchParams] = useSearchParams();
 
-  // Extract pagination states from Redux
-  const {
-    items = [],
-    loading,
-    categories = [],
-    filters = {},
-    pages = 1,
-    page = 1,
-  } = useSelector((state) => state.products || {});
+  const { products, categories, loading } = useSelector(
+    (state) => state.products || { products: [], categories: [] }
+  );
 
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [sortOption, setSortOption] = useState("newest");
+
+  // Pagination states: exactly 12 products per page
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
+
+  // Fetch products & categories on initial load
   useEffect(() => {
     dispatch(fetchCategories());
+    dispatch(fetchProducts());
   }, [dispatch]);
 
-  useEffect(() => {
-    const keyword = searchParams.get("keyword") || "";
-    dispatch(setFilters({ keyword }));
-  }, [searchParams, dispatch]);
+  // Safely extract products array
+  const rawProductList = Array.isArray(products)
+    ? products
+    : products?.products || products?.data || [];
 
-  // Refetch when filters change (resets to page 1)
-  useEffect(() => {
-    dispatch(fetchProducts({ ...filters, page: 1, limit: 12 }));
-  }, [dispatch, filters.keyword, filters.category, filters.minPrice, filters.maxPrice, filters.sort]);
+  // Filter products based on category and price range
+  const filteredProducts = rawProductList.filter((product) => {
+    if (!product) return false;
 
-  const handleFilterUpdate = (patch) => {
-    dispatch(setFilters(patch));
+    const categoryMatches =
+      selectedCategory === "All" ||
+      selectedCategory === "All categories" ||
+      !selectedCategory ||
+      product.category?.toLowerCase() === selectedCategory.toLowerCase();
+
+    const price = Number(product.price) || 0;
+    const min = minPrice !== "" ? Number(minPrice) : null;
+    const max = maxPrice !== "" ? Number(maxPrice) : null;
+
+    const minMatches = min === null || isNaN(min) || price >= min;
+    const maxMatches = max === null || isNaN(max) || price <= max;
+
+    return categoryMatches && minMatches && maxMatches;
+  });
+
+  // Sort products
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    if (sortOption === "price-low") {
+      return (a.price || 0) - (b.price || 0);
+    }
+    if (sortOption === "price-high") {
+      return (b.price || 0) - (a.price || 0);
+    }
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
+
+  // 12 Items Pagination slice logic
+  const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
+  const indexOfLastProduct = currentPage * itemsPerPage;
+  const indexOfFirstProduct = indexOfLastProduct - itemsPerPage;
+  const currentProducts = sortedProducts.slice(
+    indexOfFirstProduct,
+    indexOfLastProduct
+  );
+
+  // Handlers (resets page back to 1 on filter changes)
+  const handleCategoryChange = (e) => {
+    const val = e.target.value;
+    setSelectedCategory(val);
+    setCurrentPage(1);
+    dispatch(setFilters({ category: val }));
   };
 
-  // Pagination page click handler
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pages) {
-      dispatch(fetchProducts({ ...filters, page: newPage, limit: 12 }));
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  const handleSortChange = (e) => {
+    const val = e.target.value;
+    setSortOption(val);
+    setCurrentPage(1);
+    dispatch(setFilters({ sort: val }));
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 300, behavior: "smooth" });
+  };
+
+  const handleReset = () => {
+    setSelectedCategory("All");
+    setMinPrice("");
+    setMaxPrice("");
+    setSortOption("newest");
+    setCurrentPage(1);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
-      {/* Hero Title */}
-      <section className="mb-9">
-        <h1 className="font-serif-hero text-4xl sm:text-5xl md:text-[54px] text-gray-900 leading-[1.12] tracking-tight max-w-2xl font-medium">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 font-sans">
+      {/* Hero Header */}
+      <div className="mb-10 max-w-2xl">
+        <h1 className="text-4xl sm:text-5xl font-serif font-bold text-neutral-900 leading-tight">
           Built with purpose. Crafted to endure.
         </h1>
-      </section>
+      </div>
 
-      {/* Pill Filter Bar */}
-      <div className="flex flex-wrap gap-2.5 mb-10 items-center">
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-3 mb-10">
         <select
-          value={filters.category || ""}
-          onChange={(e) => handleFilterUpdate({ category: e.target.value })}
-          className="bg-white border border-gray-200/90 rounded-full px-4 py-2 text-xs font-medium text-gray-700 shadow-2xs outline-none cursor-pointer"
+          value={selectedCategory}
+          onChange={handleCategoryChange}
+          className="bg-white border border-neutral-200 rounded-full px-4 py-2.5 text-xs text-neutral-800 outline-none focus:border-black cursor-pointer shadow-sm"
         >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
+          <option value="All">All categories</option>
+          {categories &&
+            categories.map((cat, idx) => (
+              <option key={idx} value={cat}>
+                {cat}
+              </option>
+            ))}
         </select>
 
         <input
           type="number"
           placeholder="Min price"
-          value={filters.minPrice || ""}
-          onChange={(e) => handleFilterUpdate({ minPrice: e.target.value })}
-          className="bg-white border border-gray-200/90 rounded-full px-4 py-2 text-xs font-medium text-gray-700 placeholder:text-gray-400 w-28 shadow-2xs outline-none"
+          value={minPrice}
+          onChange={(e) => {
+            setMinPrice(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="w-28 bg-white border border-neutral-200 rounded-full px-4 py-2.5 text-xs text-neutral-800 outline-none focus:border-black shadow-sm"
         />
 
         <input
           type="number"
           placeholder="Max price"
-          value={filters.maxPrice || ""}
-          onChange={(e) => handleFilterUpdate({ maxPrice: e.target.value })}
-          className="bg-white border border-gray-200/90 rounded-full px-4 py-2 text-xs font-medium text-gray-700 placeholder:text-gray-400 w-28 shadow-2xs outline-none"
+          value={maxPrice}
+          onChange={(e) => {
+            setMaxPrice(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="w-28 bg-white border border-neutral-200 rounded-full px-4 py-2.5 text-xs text-neutral-800 outline-none focus:border-black shadow-sm"
         />
 
         <select
-          value={filters.sort || "newest"}
-          onChange={(e) => handleFilterUpdate({ sort: e.target.value })}
-          className="bg-white border border-gray-200/90 rounded-full px-4 py-2 text-xs font-medium text-gray-700 shadow-2xs outline-none cursor-pointer"
+          value={sortOption}
+          onChange={handleSortChange}
+          className="bg-white border border-neutral-200 rounded-full px-4 py-2.5 text-xs text-neutral-800 outline-none focus:border-black cursor-pointer shadow-sm ml-auto"
         >
           <option value="newest">Newest</option>
-          <option value="price_asc">Price: Low to High</option>
-          <option value="price_desc">Price: High to Low</option>
-          <option value="rating">Top Rated</option>
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
         </select>
+
+        {(selectedCategory !== "All" || minPrice || maxPrice) && (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="text-xs text-neutral-500 hover:text-black underline cursor-pointer px-2"
+          >
+            Reset
+          </button>
+        )}
       </div>
 
-      {/* Product Grid */}
-      {loading ? (
-        <div className="text-center py-20 text-sm text-gray-400">Loading products...</div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-20 text-sm text-gray-400">No products match your criteria.</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {items.map((p) => (
-            <ProductCard key={p._id || p.id} product={p} />
-          ))}
+      {/* Loading State */}
+      {loading && rawProductList.length === 0 && (
+        <div className="text-center py-20 text-neutral-400 text-sm">
+          Loading products...
         </div>
       )}
 
-      {/* ========================================= */}
-      {/* PAGINATION CONTROLS (Add this right here) */}
-      {/* ========================================= */}
-      {pages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-14 pt-6 border-t border-gray-200/60">
-          {/* Previous Page Button */}
+      {/* Empty State */}
+      {!loading && sortedProducts.length === 0 && (
+        <div className="text-center py-24">
+          <p className="text-sm text-neutral-500">No products match your criteria.</p>
+        </div>
+      )}
+
+      {/* 12-Product Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {currentProducts.map((product) => (
+          <ProductCard
+            key={product._id || product.id}
+            product={product}
+          />
+        ))}
+      </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-12 pt-6 border-t border-neutral-100">
           <button
-            onClick={() => handlePageChange(page - 1)}
-            disabled={page === 1}
-            className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-700 hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+            type="button"
+            disabled={currentPage === 1}
+            onClick={() => handlePageChange(currentPage - 1)}
+            className="px-3.5 py-2 text-xs font-semibold rounded-full border border-neutral-200 text-neutral-700 hover:border-black disabled:opacity-40 disabled:hover:border-neutral-200 cursor-pointer disabled:cursor-not-allowed transition-colors"
           >
-            <FiChevronLeft size={16} />
+            ← Prev
           </button>
 
-          {/* Numbered Page Buttons */}
-          {Array.from({ length: pages }, (_, i) => i + 1).map((pageNum) => (
-            <button
-              key={pageNum}
-              onClick={() => handlePageChange(pageNum)}
-              className={`w-9 h-9 rounded-full text-xs font-semibold transition shadow-2xs ${
-                pageNum === page
-                  ? "bg-[#1A1A1A] text-white"
-                  : "bg-white border border-gray-200 text-gray-700 hover:border-gray-400"
-              }`}
-            >
-              {pageNum}
-            </button>
-          ))}
+          {Array.from({ length: totalPages }, (_, index) => {
+            const pageNum = index + 1;
+            const isActive = currentPage === pageNum;
 
-          {/* Next Page Button */}
+            return (
+              <button
+                key={pageNum}
+                type="button"
+                onClick={() => handlePageChange(pageNum)}
+                className={`w-8 h-8 flex items-center justify-center text-xs font-bold rounded-full transition-colors cursor-pointer ${
+                  isActive
+                    ? "bg-black text-white shadow-sm"
+                    : "text-neutral-700 hover:bg-neutral-100 border border-neutral-200"
+                }`}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
+
           <button
-            onClick={() => handlePageChange(page + 1)}
-            disabled={page === pages}
-            className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-700 hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+            type="button"
+            disabled={currentPage === totalPages}
+            onClick={() => handlePageChange(currentPage + 1)}
+            className="px-3.5 py-2 text-xs font-semibold rounded-full border border-neutral-200 text-neutral-700 hover:border-black disabled:opacity-40 disabled:hover:border-neutral-200 cursor-pointer disabled:cursor-not-allowed transition-colors"
           >
-            <FiChevronRight size={16} />
+            Next →
           </button>
         </div>
       )}

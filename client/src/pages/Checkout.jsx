@@ -1,186 +1,202 @@
 import React, { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router";
-import { placeOrder } from "../redux/thunks/orderThunks";
-import { clearCart } from "../redux/slices/cartSlice";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { clearCart } from "../redux/slices/cartSlice.js";
 
 const Checkout = () => {
-  const { items } = useSelector((state) => state.cart);
-  const { user } = useSelector((state) => state.auth);
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [shippingAddress, setShippingAddress] = useState({
-    street: user?.address?.street || "",
-    city: user?.address?.city || "",
-    state: user?.address?.state || "",
-    zip: user?.address?.zip || "",
+  const { user } = useSelector((state) => state.auth);
+  const { cartItems } = useSelector((state) => state.cart || { cartItems: [] });
+
+  const [address, setAddress] = useState({
+    street: user?.address?.street || "4/41, Natarajan illam",
+    city: user?.address?.city || "Tharagampatti",
+    state: user?.address?.state || "Tamil Nadu, Karur",
+    zip: user?.address?.zip || "kadavur",
     country: user?.address?.country || "India",
   });
 
-  const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
-  const [submitting, setSubmitting] = useState(false);
-  const [orderError, setOrderError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cartItems.reduce(
+    (acc, item) => acc + item.price * (item.qty || 1),
+    0
+  );
+  const shippingFee = subtotal > 1000 || subtotal === 0 ? 0 : 50;
+  const total = subtotal + shippingFee;
 
-  const handleAddressChange = (e) => {
-    setShippingAddress({ ...shippingAddress, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setAddress({ ...address, [e.target.name]: e.target.value });
   };
 
-  const handleOrderSubmit = async (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (items.length === 0) return;
+    setError("");
 
-    setSubmitting(true);
-    setOrderError("");
+    const activeCart =
+      cartItems && cartItems.length > 0
+        ? cartItems
+        : JSON.parse(localStorage.getItem("cartItems") || "[]");
+
+    if (!activeCart || activeCart.length === 0) {
+      setError("Cannot place an order with an empty cart.");
+      return;
+    }
+
+    const formattedItems = activeCart.map((item) => ({
+      _id: item._id,
+      product: item._id,
+      name: item.name,
+      price: item.price,
+      qty: item.qty || 1,
+      quantity: item.qty || 1,
+      image:
+        item.image ||
+        item.imageUrl ||
+        "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80",
+    }));
+
+    const calculatedTotal = Number(total > 0 ? total : 59);
 
     const orderPayload = {
-      items: items.map((i) => ({
-        product: i.productId,
-        name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-      })),
-      shippingAddress,
-      paymentMethod,
-      totalAmount: subtotal,
+      orderItems: formattedItems,
+      items: formattedItems,
+      shippingAddress: address,
+      totalAmount: calculatedTotal,
+      totalPrice: calculatedTotal,
+      paymentMethod: "Cash on Delivery",
     };
 
-    const result = await dispatch(placeOrder(orderPayload));
+    if (!user) {
+      sessionStorage.setItem("pendingOrder", JSON.stringify(orderPayload));
+      navigate("/login", { state: { from: "/checkout", defaultTab: "register" } });
+      return;
+    }
 
-    if (result.meta.requestStatus === "fulfilled") {
+    try {
+      setLoading(true);
+      const token =
+        user?.token ||
+        JSON.parse(localStorage.getItem("user") || "{}")?.token;
+
+      const response = await axios.post("http://localhost:5000/api/orders", orderPayload, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
       dispatch(clearCart());
-      navigate("/orders");
-    } else {
-      setOrderError(result.payload || "Failed to place order.");
-      setSubmitting(false);
+      sessionStorage.removeItem("pendingOrder");
+
+      const createdOrderId = response.data?._id || response.data?.order?._id;
+      if (createdOrderId) {
+        navigate(`/order-success/${createdOrderId}`);
+      } else {
+        navigate("/orders");
+      }
+    } catch (err) {
+      console.error("Order error:", err);
+      setError(err.response?.data?.message || "Failed to place order.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (items.length === 0) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-20 text-center">
-        <h2 className="text-2xl font-bold mb-3">No items to checkout</h2>
-        <button onClick={() => navigate("/")} className="text-clay underline">
-          Continue shopping
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-      <h1 className="font-display text-3xl font-semibold mb-8">Checkout</h1>
+    <div className="max-w-2xl mx-auto px-4 py-12">
+      <h1 className="text-3xl sm:text-4xl font-serif font-bold text-neutral-900 mb-8">
+        Checkout
+      </h1>
 
-      {orderError && (
-        <div className="p-4 mb-6 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm">
-          {orderError}
-        </div>
-      )}
+      <div className="bg-white border border-neutral-200/80 rounded-2xl p-6 sm:p-8 shadow-sm">
+        <h2 className="text-base font-semibold text-neutral-800 mb-4">
+          Shipping Details
+        </h2>
 
-      <form onSubmit={handleOrderSubmit} className="grid md:grid-cols-3 gap-10">
-        <div className="md:col-span-2 space-y-6">
-          <div className="bg-white border border-ink/10 rounded-2xl p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Shipping Address</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                required
-                name="street"
-                placeholder="Street address"
-                value={shippingAddress.street}
-                onChange={handleAddressChange}
-                className="w-full border border-ink/15 rounded-xl px-4 py-3 md:col-span-2 focus:ring-1 focus:ring-ink outline-none"
-              />
-              <input
-                required
-                name="city"
-                placeholder="City"
-                value={shippingAddress.city}
-                onChange={handleAddressChange}
-                className="w-full border border-ink/15 rounded-xl px-4 py-3 focus:ring-1 focus:ring-ink outline-none"
-              />
-              <input
-                required
-                name="state"
-                placeholder="State"
-                value={shippingAddress.state}
-                onChange={handleAddressChange}
-                className="w-full border border-ink/15 rounded-xl px-4 py-3 focus:ring-1 focus:ring-ink outline-none"
-              />
-              <input
-                required
-                name="zip"
-                placeholder="ZIP Code"
-                value={shippingAddress.zip}
-                onChange={handleAddressChange}
-                className="w-full border border-ink/15 rounded-xl px-4 py-3 focus:ring-1 focus:ring-ink outline-none"
-              />
-              <input
-                required
-                name="country"
-                placeholder="Country"
-                value={shippingAddress.country}
-                onChange={handleAddressChange}
-                className="w-full border border-ink/15 rounded-xl px-4 py-3 focus:ring-1 focus:ring-ink outline-none"
-              />
-            </div>
+        {error && (
+          <div className="mb-4 text-xs text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handlePlaceOrder} className="space-y-4">
+          <div>
+            <input
+              type="text"
+              name="street"
+              required
+              value={address.street}
+              onChange={handleChange}
+              placeholder="Street Address"
+              className="w-full bg-[#ecf2fe] border-none rounded-xl px-4 py-3 text-sm text-neutral-800 outline-none focus:ring-1 focus:ring-black"
+            />
           </div>
 
-          <div className="bg-white border border-ink/10 rounded-2xl p-6 space-y-3">
-            <h2 className="text-lg font-semibold">Payment Option</h2>
-            <div className="space-y-2">
-              {["Cash on Delivery", "UPI / Card Online"].map((method) => (
-                <label key={method} className="flex items-center gap-3 p-3 border border-ink/10 rounded-xl cursor-pointer">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value={method}
-                    checked={paymentMethod === method}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                  />
-                  <span className="text-sm font-medium">{method}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-ink/10 rounded-2xl p-6 h-fit sticky top-24">
-          <h2 className="text-lg font-semibold mb-4">Summary</h2>
-          <div className="divide-y divide-ink/10 mb-4 max-h-48 overflow-y-auto">
-            {items.map((i) => (
-              <div key={i.productId} className="py-2 text-sm flex justify-between">
-                <span>{i.name} × {i.quantity}</span>
-                <span>₹{i.price * i.quantity}</span>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="city"
+              required
+              value={address.city}
+              onChange={handleChange}
+              placeholder="City"
+              className="w-full bg-[#ecf2fe] border-none rounded-xl px-4 py-3 text-sm text-neutral-800 outline-none focus:ring-1 focus:ring-black"
+            />
+            <input
+              type="text"
+              name="state"
+              required
+              value={address.state}
+              onChange={handleChange}
+              placeholder="State"
+              className="w-full bg-[#ecf2fe] border-none rounded-xl px-4 py-3 text-sm text-neutral-800 outline-none focus:ring-1 focus:ring-black"
+            />
           </div>
 
-          <div className="border-t border-ink/10 pt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-ink/60">Subtotal</span>
-              <span>₹{subtotal}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink/60">Delivery</span>
-              <span className="text-moss font-medium">Free</span>
-            </div>
-            <div className="flex justify-between text-base font-bold pt-2 border-t border-ink/10">
-              <span>Total</span>
-              <span>₹{subtotal}</span>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <input
+              type="text"
+              name="zip"
+              required
+              value={address.zip}
+              onChange={handleChange}
+              placeholder="ZIP / Postal Code"
+              className="w-full bg-[#ecf2fe] border-none rounded-xl px-4 py-3 text-sm text-neutral-800 outline-none focus:ring-1 focus:ring-black"
+            />
+            <input
+              type="text"
+              name="country"
+              required
+              value={address.country}
+              onChange={handleChange}
+              placeholder="Country"
+              className="w-full bg-white border border-neutral-200 rounded-xl px-4 py-3 text-sm text-neutral-800 outline-none focus:border-black"
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-6 pb-2 text-neutral-900">
+            <span className="font-serif font-bold text-base sm:text-lg">
+              Total (Cash on Delivery)
+            </span>
+            <span className="font-serif font-bold text-base sm:text-lg">
+              ₹{(total > 0 ? total : 59).toFixed(2)}
+            </span>
           </div>
 
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full mt-6 bg-ink text-paper rounded-full py-3 hover:bg-plum transition-colors font-medium disabled:opacity-50"
+            disabled={loading}
+            className="w-full bg-neutral-900 hover:bg-black text-white py-3.5 rounded-full font-medium text-sm transition-colors cursor-pointer mt-2 disabled:bg-neutral-400"
           >
-            {submitting ? "Placing Order..." : "Confirm & Pay"}
+            {loading ? "Placing Order..." : "Place Order"}
           </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

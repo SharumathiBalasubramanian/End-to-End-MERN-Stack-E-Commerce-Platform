@@ -1,67 +1,69 @@
 import { createSlice } from "@reduxjs/toolkit";
 import {
   fetchProducts,
-  fetchProductById,
   fetchCategories,
-  fetchRecommendations,
+  fetchProductById,
 } from "../thunks/productThunks.js";
+
+const initialState = {
+  products: [],
+  categories: [],
+  selectedProduct: null,
+  filters: {
+    category: "All",
+    sort: "newest",
+    search: "",
+  },
+  loading: false,
+  error: null,
+};
 
 const productSlice = createSlice({
   name: "products",
-  initialState: {
-    items: [],
-    total: 0,
-    pages: 1,
-    page: 1,
-    categories: [],
-    filters: { keyword: "", category: "", minPrice: "", maxPrice: "", sort: "newest" },
-    selectedProduct: null,
-    recommendations: [],
-    loading: false,
-    error: null,
-  },
+  initialState,
   reducers: {
+    // Action imported by Home.jsx to filter products by category, sort, or search
     setFilters: (state, action) => {
-      state.filters = { ...state.filters, ...action.payload };
+      state.filters = {
+        ...state.filters,
+        ...action.payload,
+      };
+    },
+    clearFilters: (state) => {
+      state.filters = initialState.filters;
     },
     clearSelectedProduct: (state) => {
       state.selectedProduct = null;
-      state.recommendations = [];
     },
   },
   extraReducers: (builder) => {
     builder
+      // Fetch Products
       .addCase(fetchProducts.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.loading = false;
-        const raw = action.payload?.products || action.payload?.data || (Array.isArray(action.payload) ? action.payload : []);
-        state.items = raw;
-        state.total = action.payload?.total || raw.length;
-        state.pages = action.payload?.pages || 1;
-        state.page = action.payload?.page || 1;
+        state.products = action.payload;
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(fetchProductById.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(fetchProductById.fulfilled, (state, action) => {
-        state.loading = false;
-        state.selectedProduct = action.payload;
-      })
+      // Fetch Categories
       .addCase(fetchCategories.fulfilled, (state, action) => {
         state.categories = action.payload;
       })
-      .addCase(fetchRecommendations.fulfilled, (state, action) => {
-        state.recommendations = action.payload;
+      .addCase(fetchCategories.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      // Fetch Single Product
+      .addCase(fetchProductById.fulfilled, (state, action) => {
+        state.selectedProduct = action.payload;
       });
   },
 });
 
-export const { setFilters, clearSelectedProduct } = productSlice.actions;
+export const { setFilters, clearFilters, clearSelectedProduct } = productSlice.actions;
 export default productSlice.reducer;

@@ -1,110 +1,208 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchProductById, fetchRecommendations } from "../redux/thunks/productThunks.js";
-import { clearSelectedProduct } from "../redux/slices/productSlice.js";
+import axios from "axios";
 import { addToCart } from "../redux/slices/cartSlice.js";
-import ProductCard from "../components/ProductCard.jsx";
-import { FiStar, FiShoppingBag, FiArrowLeft } from "react-icons/fi";
 
-const ProductDetail = () => {
+const ProductDetails = () => {
   const { id } = useParams();
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const { selectedProduct: product, recommendations, loading } = useSelector((state) => state.products);
+  // Try getting products from existing Redux state first
+  const { products } = useSelector((state) => state.products || { products: [] });
+
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [qty, setQty] = useState(1);
-  const [toast, setToast] = useState(false);
+  const [added, setAdded] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      dispatch(fetchProductById(id));
-      dispatch(fetchRecommendations(id));
-    }
-    return () => dispatch(clearSelectedProduct());
-  }, [dispatch, id]);
+    const loadProduct = async () => {
+      setLoading(true);
+      setError("");
 
-  const handleAdd = () => {
-    dispatch(
-      addToCart({
-        productId: product._id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        stock: product.stock,
-        quantity: qty,
-      })
-    );
-    setToast(true);
-    setTimeout(() => setToast(false), 2000);
+      // 1. Check if the product is already loaded in Redux products array
+      const existingProduct = products?.find(
+        (p) => String(p._id) === String(id) || String(p.id) === String(id)
+      );
+
+      if (existingProduct) {
+        setProduct(existingProduct);
+        setLoading(false);
+        return;
+      }
+
+      // 2. If not found in Redux, fetch from backend
+      try {
+        const res = await axios.get(`http://localhost:5000/api/products/${id}`);
+        const data = res.data?.data || res.data;
+
+        if (data && (data._id || data.name)) {
+          setProduct(data);
+        } else {
+          setError("Product details could not be found.");
+        }
+      } catch (err) {
+        console.error("API error:", err);
+        setError(err.response?.data?.message || "Failed to load product details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadProduct();
+    }
+  }, [id, products]);
+
+  const handleAddToCart = () => {
+    if (!product) return;
+    dispatch(addToCart({ ...product, qty: Number(qty) }));
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1200);
   };
 
-  if (loading || !product) {
-    return <div className="min-h-[50vh] flex items-center justify-center font-medium">Loading details...</div>;
+  const handleBuyNow = () => {
+    if (!product) return;
+    dispatch(addToCart({ ...product, qty: Number(qty) }));
+    navigate("/checkout");
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-28 text-center text-neutral-500">
+        Loading product details...
+      </div>
+    );
   }
 
+  if (error || !product) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 text-center">
+        <h2 className="text-xl font-bold text-neutral-900 mb-2">Product Not Found</h2>
+        <p className="text-xs text-neutral-500 mb-6">{error || "Could not retrieve this item."}</p>
+        <button
+          onClick={() => navigate("/")}
+          className="bg-black text-white px-6 py-2.5 rounded-full text-xs font-semibold cursor-pointer"
+        >
+          Return to Shop
+        </button>
+      </div>
+    );
+  }
+
+  const imgSrc =
+    product.image ||
+    product.imageUrl ||
+    product.images?.[0] ||
+    "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=700&q=80";
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-12">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-ink/60 hover:text-ink font-semibold">
-        <FiArrowLeft /> Back to catalog
+    <div className="max-w-6xl mx-auto px-4 py-12">
+      <button
+        onClick={() => navigate(-1)}
+        className="text-xs font-semibold text-neutral-500 hover:text-black mb-8 flex items-center gap-1 cursor-pointer"
+      >
+        ← Back to Shop
       </button>
 
-      <div className="bg-white border border-ink/10 rounded-3xl p-6 md:p-10 shadow-sm grid md:grid-cols-2 gap-10">
-        <div className="aspect-square bg-sand rounded-2xl overflow-hidden">
-          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+        {/* Product Image */}
+        <div className="bg-neutral-100 rounded-3xl overflow-hidden shadow-sm aspect-square flex items-center justify-center">
+          <img
+            src={imgSrc}
+            alt={product.name}
+            className="w-full h-full object-cover object-center"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src =
+                "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=700&q=80";
+            }}
+          />
         </div>
 
-        <div className="flex flex-col justify-between space-y-6">
+        {/* Details Column */}
+        <div className="space-y-6">
           <div>
-            <span className="text-xs uppercase tracking-widest text-clay font-bold bg-sand px-3 py-1 rounded-full mb-3 inline-block">
-              {product.category}
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-widest block mb-2">
+              {product.category || "Handcrafted"}
             </span>
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-3">{product.name}</h1>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1">
-                <FiStar className="fill-amber-500 text-amber-500" /> {product.ratings}
+            <h1 className="text-3xl sm:text-4xl font-serif font-bold text-neutral-900 leading-tight">
+              {product.name}
+            </h1>
+            <div className="flex items-center gap-3 mt-3">
+              <span className="text-amber-500 font-bold text-sm">
+                ★ {product.rating || 4.8}
               </span>
-              <span className="text-xs text-ink/50">({product.numReviews} ratings)</span>
-            </div>
-            <p className="text-ink/75 leading-relaxed text-sm mb-6">{product.description}</p>
-            <div className="border-t border-b border-ink/10 py-4">
-              <p className="text-3xl font-extrabold">₹{product.price}</p>
-              <p className={`text-xs mt-1 font-semibold ${product.stock > 0 ? "text-moss" : "text-red-500"}`}>
-                {product.stock > 0 ? `${product.stock} units in inventory` : "Out of stock"}
-              </p>
+              <span className="text-xs text-neutral-300">|</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-medium text-green-700 bg-green-50">
+                In Stock
+              </span>
             </div>
           </div>
 
+          <div className="text-3xl font-extrabold text-neutral-900">
+            ₹{product.price}
+          </div>
+
+          <div className="border-t border-b border-neutral-100 py-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-2">
+              Description
+            </h3>
+            <p className="text-sm text-neutral-600 leading-relaxed">
+              {product.description || "Handmade with artisan care and premium craft materials."}
+            </p>
+          </div>
+
+          {/* Quantity Controls */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center border border-ink/20 rounded-full bg-sand/30">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-10 h-10 font-bold">−</button>
-              <span className="w-8 text-center text-sm font-semibold">{qty}</span>
-              <button onClick={() => setQty(Math.min(product.stock, qty + 1))} className="w-10 h-10 font-bold">+</button>
+            <span className="text-xs font-semibold text-neutral-700">Quantity:</span>
+            <div className="flex items-center border border-neutral-200 rounded-full px-3 py-1 gap-3">
+              <button
+                type="button"
+                onClick={() => setQty((prev) => Math.max(1, prev - 1))}
+                className="text-base font-bold text-neutral-500 hover:text-black cursor-pointer"
+              >
+                -
+              </button>
+              <span className="text-xs font-semibold w-4 text-center">{qty}</span>
+              <button
+                type="button"
+                onClick={() => setQty((prev) => prev + 1)}
+                className="text-base font-bold text-neutral-500 hover:text-black cursor-pointer"
+              >
+                +
+              </button>
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
-              onClick={handleAdd}
-              disabled={product.stock === 0}
-              className="flex-1 bg-ink text-white rounded-full py-3.5 px-6 flex items-center justify-center gap-2 hover:bg-plum font-semibold disabled:opacity-40"
+              type="button"
+              onClick={handleAddToCart}
+              className={`flex-1 py-3.5 rounded-full font-semibold text-sm transition-colors cursor-pointer ${
+                added
+                  ? "bg-green-600 text-white"
+                  : "bg-neutral-900 hover:bg-black text-white"
+              }`}
             >
-              <FiShoppingBag /> {toast ? "Added to Cart!" : "Add to Cart"}
+              {added ? "✓ Added to Cart" : "Add to Cart"}
+            </button>
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              className="flex-1 py-3.5 rounded-full font-semibold text-sm border border-neutral-900 text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+            >
+              Buy Now
             </button>
           </div>
         </div>
       </div>
-
-      {recommendations.length > 0 && (
-        <section className="pt-6">
-          <h2 className="text-2xl font-bold mb-1">Recommended for You</h2>
-          <p className="text-xs text-ink/50 mb-6">Generated by RapidMiner Similarity Matrix Model</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {recommendations.map((item) => (
-              <ProductCard key={item._id} product={item} />
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 };
 
-export default ProductDetail;
+export default ProductDetails;
